@@ -9,6 +9,7 @@ import parametrs
 from UIRS import Ui_MainWindow
 from Form2 import Ui_MainWindow2
 from Form3 import Ui_MainWindow3
+from show_parametrs import *
 
 
 class FirstW(QMainWindow, Ui_MainWindow):
@@ -16,70 +17,73 @@ class FirstW(QMainWindow, Ui_MainWindow):
         super(FirstW, self).__init__()
         self.uif = Ui_MainWindow()
         self.uif.setupUi(self)
+
         self.number_tr = number_tr
 
-        self.uif.lineEdit.textChanged.connect(self.calc_teta_pc)
-        self.uif.lineEdit_3.textChanged.connect(self.calc_teta_pc)
+        self.f = self.uif.lineEdit_4.text()
+
         self.uif.pushButton.clicked.connect(self.F2show)
         self.uif.pushButton_3.clicked.connect(self.F3show)
+        self.uif.lineEdit.textChanged.connect(self.calculate_pc1)
+        self.uif.lineEdit_4.textChanged.connect(self.calculate_pc1)
+        self.uif.lineEdit_9.textChanged.connect(self.calculate_pc1)
+
+        self.uif.pushButton.setEnabled(False)
 
         if number_tr == -1:
             self.name = '1. Транзистор не выбран'
             self.uif.lineEdit.setEnabled(False)
             self.uif.lineEdit_2.setEnabled(False)
-            self.uif.lineEdit_3.setEnabled(False)
             self.uif.lineEdit_4.setEnabled(False)
-            self.uif.pushButton.setEnabled(False)
+            self.uif.lineEdit_9.setEnabled(False)
         else:
             self.name_tr = parametrs.parametrs_tranzitions(number_tr)[1]
             self.name = f"1. Выбран транзистор: {self.name_tr}"
+            self.uif.label.setText(self.name)
+
             self.e_si_dop = float(parametrs.parametrs_tranzitions(number_tr)[24])
             self.e_c0 = float(parametrs.parametrs_tranzitions(number_tr)[5])
-            self.v = 0.5 * (self.e_si_dop + self.e_c0)
             self.e_ots = float(parametrs.parametrs_tranzitions(number_tr)[3])
             self.rc = float(parametrs.parametrs_tranzitions(number_tr)[13])
             self.ri = float(parametrs.parametrs_tranzitions(number_tr)[14])
 
-        self.uif.label.setText(self.name)
+
+    def calculate_pc1(self):
+        try:
+            self.f = float(self.uif.lineEdit_4.text())
+            self.teta = float(self.uif.lineEdit.text())
+            self.c = Conditions()
+            self.ec = float(self.uif.lineEdit_9.text())
+
+            if self.c.conditions_1(self.ec, self.e_c0, self.e_si_dop) is True:
+                self.uif.label_9.setStyleSheet('')
+                self.uif.label_9.setText('Напряжение питания стока, В')
+                self.pcmax = float(formul.pc1max(self.teta, self.ec, self.e_c0, self.rc, self.ri, Icnas=0.2))
+                self.uif.label_8.setText(f'Максимальная допустимая мощность\n{self.pcmax} Вт')
+                self.uif.pushButton.setEnabled(True)
+            else:
+                self.uif.label_9.setStyleSheet('color: red')
+                self.uif.label_9.setText('Питания больше максимально допустимого значения')
+
+        except ValueError:
+            self.uif.label_8.setText(f'Максимальная допустимое значение ...')
 
     def F2show(self):
-        pc1 = float(self.uif.lineEdit_2.text())
-        uip = float(self.uif.lineEdit.text())
-        us = float(self.uif.lineEdit_3.text())
-        f = float(self.uif.lineEdit_4.text())
-        teta = formul.teta_formul(E=self.e_ots, Us=us, Uip=uip)
-        pc1max = formul.pc1max(teta=teta, Ec=uip, Ec0=self.e_c0, rc=self.rc, ri=self.ri, Icnas=0.2)
-
-        if us < self.v:
-            if pc1 < pc1max:
-                self.sw = SecW(uip=uip, pc1=pc1,
-                               teta=teta, f=f,
-                               e_ots=self.e_ots, rc=self.rc, ri=self.ri, number_tr=self.number_tr)
-                self.sw.show()
-            else:
-                QMessageBox.critical(self, "Ошибка", "Мощность на стоке должна быть меньше максимальной!")
+        ''' Переход к показу выходных параметров'''
+        self.pc1 = float(self.uif.lineEdit_2.text())
+        if self.pc1 > self.pcmax:
+            QMessageBox.warning(self, 'Error1', f'Максимальная допустимая мощность не может быть меньше мощности выходных параметров. '
+                                                f'Введите число меньше {self.pcmax} Вт')
         else:
-            QMessageBox.critical(self, "Ошибка", f"Большое напряжение смещение для транзистора {self.name_tr}. "
-                                                 f"Необходимо уменьшить напряжение смещения чтобы было меньше {self.v} В")
+            self.sw = SecW(uip=self.ec, pc1=self.pc1, teta=self.teta, f=self.f, e_ots=self.e_ots, rc=self.rc, ri=self.ri, number_tr=self.number_tr)
+            self.sw.show()
+
 
     def F3show(self):
-        '''Переход на третье окно'''
+        '''Переход на выбор транзистора'''
         self.tF = TrW()
         self.tF.show()
         self.close()
-
-    def calc_teta_pc(self):
-        try:
-            us = float(self.uif.lineEdit_3.text())
-            uip = float(self.uif.lineEdit.text())
-            e_ots = float(parametrs.parametrs_tranzitions(self.number_tr)[3])
-            teta = formul.teta_formul(E=e_ots, Us=us, Uip=uip)
-            pc1max = formul.pc1max(teta=teta, Ec=uip, Ec0=self.e_c0, rc=self.rc, ri=self.ri, Icnas=0.2)
-            self.uif.label_8.setText(f"{round(teta, 4)}")
-            self.uif.label_4.setText(f"<{round(pc1max, 3)} Вт")
-        except ValueError:
-            self.uif.label_8.setText('teta не определена')
-            self.uif.label_4.setText('pc1max не определена')
 
 
 class SecW(QMainWindow, Ui_MainWindow2):
@@ -157,14 +161,12 @@ class SecW(QMainWindow, Ui_MainWindow2):
                            'Рассеиваемая мощность': [round(self.pras, self.n), 'Вт'],
                            'Напряжение смещения на затворе': [round(self.ez, self.n), 'В'],
                            'Максимальное напряжение на затворе': [round(self.ez_max, self.n), 'В']}
-
-        self.param_name = list(self.param_dict)
-        self.param_key = list(self.param_dict.values())
-
-        for i in range(len(self.param_name)):
-            self.label = QLabel(f"{i + 1}. {self.param_name[i]}: {self.param_key[i][0]} {self.param_key[i][1]}", self)
-            self.label.setGeometry(40, i * 30, 700, 100)
+        self.i = 0
+        for name, key in self.param_dict.items():
+            self.label = QLabel(f"{self.i + 1}. {name}: {key[0]} {key[1]}", self)
+            self.label.setGeometry(40, self.i * 30, 700, 100)
             self.label.setFont(QFont('Arial', 12))
+            self.i += 1
 
     def rezist_vh(self):
         if self.xn >= 0:

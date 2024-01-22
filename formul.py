@@ -1,5 +1,6 @@
 import math
 import numpy as np
+
 def a0(teta):
     teta = teta * math.pi / 180
     if teta == 0:
@@ -159,5 +160,3 @@ def Ez(Eots, Ic1, teta, ft, Czk):
 
 def Ezmax(Ez, Ic1, ft, teta, Czk):
     return Ez + Ic1 / (2 * math.pi * ft * g1(teta) * Czk)
-
-
